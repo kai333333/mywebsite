@@ -1,224 +1,371 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>AI Service - Chat & Image</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>经典俄罗斯方块</title>
     <style>
-        .tab-active { border-b-2 solid #2563eb; color: #2563eb; }
-        .img-preview { max-width: 200px; max-height: 200px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        /* 游戏主画布 */
+        #game-board {
+            border: 3px solid #ffffff;
+            background-color: #000;
+        }
+
+        /* 右侧信息面板 */
+        .info-panel {
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            font-size: 18px;
+        }
+
+        .score-box, .next-box {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            width: 180px;
+        }
+
+        h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+
+        /* 按钮样式 */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background: #00ccff;
+            color: #000;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #0088bb;
+            color: white;
+        }
+
+        /* 下一个方块预览画布 */
+        #next-piece {
+            border: 2px solid #fff;
+            background: #000;
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Login -->
-    <div id="auth" class="max-w-md mx-auto mt-20 p-6 bg-white rounded-xl shadow">
-        <h2 class="text-2xl font-bold mb-4">Login / Register</h2>
-        <input id="email" placeholder="Email" class="w-full p-2 border rounded mb-4">
-        <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded">Continue</button>
-    </div>
-
-    <!-- Main -->
-    <div id="main" class="hidden max-w-6xl mx-auto p-5">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-blue-700">AI Service</h1>
-            <div class="text-lg font-semibold">Balance: <span id="points" class="text-green-600">0</span> Points</div>
-        </div>
-
-        <!-- Recharge -->
-        <div class="grid grid-cols-3 gap-4 mb-6">
-            <div class="bg-white p-4 rounded-xl shadow text-center cursor-pointer" onclick="recharge('10')">
-                <div class="text-xl font-bold">$10</div>
-                <div class="text-gray-600">100 Points</div>
+<body>
+    <h1 style="color: white;">经典俄罗斯方块</h1>
+    <div class="game-container">
+        <!-- 游戏主区域 -->
+        <canvas id="game-board" width="300" height="600"></canvas>
+        
+        <!-- 右侧信息面板 -->
+        <div class="info-panel">
+            <div class="score-box">
+                <h3>当前得分</h3>
+                <p id="score">0</p>
             </div>
-            <div class="bg-white p-4 rounded-xl shadow text-center cursor-pointer" onclick="recharge('20')">
-                <div class="text-xl font-bold">$20</div>
-                <div class="text-gray-600">220 Points</div>
+            <div class="next-box">
+                <h3>下一个方块</h3>
+                <canvas id="next-piece" width="120" height="120"></canvas>
             </div>
-            <div class="bg-white p-4 rounded-xl shadow text-center cursor-pointer" onclick="recharge('50')">
-                <div class="text-xl font-bold">$50</div>
-                <div class="text-gray-600">600 Points</div>
+            <div class="btn-group">
+                <button id="start-btn">开始游戏</button>
+                <button id="pause-btn">暂停游戏</button>
+                <button id="reset-btn">重新开始</button>
             </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="flex gap-6 mb-6 border-b">
-            <div id="tab-chat" class="pb-2 font-semibold tab-active cursor-pointer" onclick="switchTab('chat')">Chat</div>
-            <div id="tab-image" class="pb-2 font-semibold text-gray-500 cursor-pointer" onclick="switchTab('image')">Image Gen</div>
-            <div id="tab-enhance" class="pb-2 font-semibold text-gray-500 cursor-pointer" onclick="switchTab('enhance')">Enhance</div>
-        </div>
-
-        <!-- Chat Tab -->
-        <div id="panel-chat" class="bg-white p-6 rounded-xl shadow mb-6">
-            <select id="model" class="mb-3 p-2 border rounded w-full">
-                <option value="basic">Basic (-3)</option>
-                <option value="advanced">Advanced (-5)</option>
-                <option value="pro">Pro (-8)</option>
-            </select>
-            <textarea id="prompt" rows="3" placeholder="Enter prompt..." class="w-full p-2 border rounded mb-3"></textarea>
-            <button onclick="runAI()" class="bg-blue-600 text-white px-4 py-2 rounded">Generate</button>
-            <textarea id="result" rows="6" placeholder="Result..." class="w-full p-2 border rounded mt-3 bg-gray-50" readonly></textarea>
-        </div>
-
-        <!-- Image Gen Tab -->
-        <div id="panel-image" class="hidden bg-white p-6 rounded-xl shadow mb-6">
-            <select id="img-size" class="mb-3 p-2 border rounded w-full">
-                <option value="512">512×512 (-5)</option>
-                <option value="768">768×768 (-8)</option>
-                <option value="1024">1024×1024 (-12)</option>
-            </select>
-            <textarea id="img-prompt" rows="3" placeholder="Describe image..." class="w-full p-2 border rounded mb-3"></textarea>
-            <button onclick="runImageGen()" class="bg-purple-600 text-white px-4 py-2 rounded">Generate Image</button>
-            <div id="img-result" class="mt-4"></div>
-        </div>
-
-        <!-- Enhance Tab (Img2Img + Beauty) -->
-        <div id="panel-enhance" class="hidden bg-white p-6 rounded-xl shadow mb-6">
-            <input type="file" id="enhance-file" accept="image/*" class="mb-3" onchange="previewEnhance()">
-            <div id="enhance-preview" class="mb-3"></div>
-            <select id="enhance-mode" class="mb-3 p-2 border rounded w-full">
-                <option value="upscale">Upscale 4x (-3)</option>
-                <option value="beauty">Beauty (-2)</option>
-                <option value="removebg">Remove BG (-4)</option>
-                <option value="style">Anime Style (-3)</option>
-                <option value="img2img">Img2Img (-6)</option>
-            </select>
-            <textarea id="enhance-prompt" rows="2" placeholder="Prompt (for img2img)..." class="w-full p-2 border rounded mb-3"></textarea>
-            <button onclick="runEnhance()" class="bg-pink-600 text-white px-4 py-2 rounded">Enhance</button>
-            <div id="enhance-result" class="mt-4"></div>
-        </div>
-
-        <!-- History -->
-        <div class="bg-white p-6 rounded-xl shadow">
-            <h3 class="font-bold mb-3">History</h3>
-            <ul id="history" class="max-h-60 overflow-y-auto"></ul>
         </div>
     </div>
 
-<script>
-let currentUser = null;
-let enhanceImgB64 = null;
+    <script>
+        // ===================== 游戏基础配置 =====================
+        const ROWS = 20;    // 行数
+        const COLS = 10;    // 列数
+        const BLOCK_SIZE = 30;  // 每个方块大小
+        const CANVAS = document.getElementById('game-board');
+        const CTX = CANVAS.getContext('2d');
+        const NEXT_CANVAS = document.getElementById('next-piece');
+        const NEXT_CTX = NEXT_CANVAS.getContext('2d');
+        
+        // 俄罗斯方块7种基础形状（坐标矩阵）
+        const SHAPES = [
+            [[1,1,1,1]],  // I型
+            [[1,1],[1,1]],// O型
+            [[0,1,0],[1,1,1]], // T型
+            [[1,0,0],[1,1,1]], // L型
+            [[0,0,1],[1,1,1]], // 反L型
+            [[1,1,0],[0,1,1]], // Z型
+            [[0,1,1],[1,1,0]]  // 反Z型
+        ];
 
-// Tab Switch
-function switchTab(tab) {
-    document.querySelectorAll('[id^="tab-"]').forEach(el=>{
-        el.classList.remove('tab-active');
-        el.classList.add('text-gray-500');
-    });
-    document.querySelectorAll('[id^="panel-"]').forEach(el=>el.classList.add('hidden'));
-    document.getElementById('tab-'+tab).classList.add('tab-active');
-    document.getElementById('tab-'+tab).classList.remove('text-gray-500');
-    document.getElementById('panel-'+tab).classList.remove('hidden');
-}
+        // 方块对应颜色
+        const COLORS = [
+            '#00ffff', '#ffff00', '#a020f0',
+            '#ffa500', '#0000ff', '#00ff00', '#ff0000'
+        ];
 
-// Login
-async function login() {
-    const email = document.getElementById('email').value.trim();
-    if(!email) return alert('Enter email');
-    const res = await fetch('/api/login', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email})
-    });
-    const data = await res.json();
-    currentUser = email;
-    document.getElementById('auth').classList.add('hidden');
-    document.getElementById('main').classList.remove('hidden');
-    refreshUser();
-}
+        // ===================== 游戏变量 =====================
+        let board = [];        // 游戏棋盘数组
+        let currentShape;      // 当前方块
+        let currentColor;      // 当前方块颜色
+        let currentX;          // 当前方块X坐标
+        let currentY;          // 当前方块Y坐标
+        let nextShape;         // 下一个方块
+        let nextColor;         // 下一个方块颜色
+        let score = 0;         // 分数
+        let gameInterval;      // 下落定时器
+        let isGameOver = false;// 游戏结束标记
+        let isPaused = false;  // 暂停标记
 
-// Refresh User
-async function refreshUser() {
-    const res = await fetch('/api/user', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:currentUser})
-    });
-    const data = await res.json();
-    document.getElementById('points').innerText = data.user.points;
-    const list = document.getElementById('history');
-    list.innerHTML = '';
-    data.user.history.slice().reverse().forEach(h=>{
-        const li = document.createElement('li');
-        li.className = 'p-2 border-b flex items-center gap-2';
-        li.innerHTML = h.includes('img_') 
-            ? `${h.split(' | ')[0]} <img src="/api/get_img/${h.split(' | ')[1]}" class="w-10 h-10 rounded">`
-            : h;
-        list.appendChild(li);
-    });
-}
+        // ===================== 初始化棋盘 =====================
+        function initBoard() {
+            board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+        }
 
-// Recharge
-async function recharge(amt) {
-    const res = await fetch('/api/recharge', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:currentUser, amount:amt})
-    });
-    await res.json();
-    alert('Recharge success');
-    refreshUser();
-}
+        // ===================== 随机生成方块 =====================
+        function randomShape() {
+            const index = Math.floor(Math.random() * SHAPES.length);
+            return { shape: SHAPES[index], color: COLORS[index] };
+        }
 
-// Chat AI
-async function runAI() {
-    const prompt = document.getElementById('prompt').value;
-    const model = document.getElementById('model').value;
-    if(!prompt) return alert('Enter prompt');
-    const res = await fetch('/api/ai', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:currentUser, prompt, model})
-    });
-    const data = await res.json();
-    if(!data.success) return alert(data.msg);
-    document.getElementById('result').value = data.result;
-    refreshUser();
-}
+        // ===================== 生成当前方块和下一个方块 =====================
+        function spawnShape() {
+            const first = randomShape();
+            const second = randomShape();
+            
+            currentShape = first.shape;
+            currentColor = first.color;
+            nextShape = second.shape;
+            nextColor = second.color;
 
-// Image Gen
-async function runImageGen() {
-    const prompt = document.getElementById('img-prompt').value;
-    const size = document.getElementById('img-size').value;
-    if(!prompt) return alert('Enter prompt');
-    const res = await fetch('/api/image_gen', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:currentUser, prompt, size})
-    });
-    const data = await res.json();
-    if(!data.success) return alert(data.msg);
-    document.getElementById('img-result').innerHTML = `
-        <img src="/api/get_img/${data.img_id}" class="img-preview rounded">
-        <a href="/api/get_img/${data.img_id}" download class="ml-2 text-blue-600">Download</a>
-    `;
-    refreshUser();
-}
+            // 初始位置（居中）
+            currentX = Math.floor(COLS / 2) - Math.floor(currentShape[0].length / 2);
+            currentY = 0;
 
-// Preview Enhance Image
-function previewEnhance() {
-    const file = document.getElementById('enhance-file').files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-        enhanceImgB64 = e.target.result.split(',')[1];
-        document.getElementById('enhance-preview').innerHTML = `<img src="${e.target.result}" class="img-preview rounded">`;
-    };
-    reader.readAsDataURL(file);
-}
+            // 生成即碰撞 = 游戏结束
+            if (collisionCheck(currentShape, currentX, currentY)) {
+                isGameOver = true;
+            }
+        }
 
-// Run Enhance
-async function runEnhance() {
-    const mode = document.getElementById('enhance-mode').value;
-    const prompt = document.getElementById('enhance-prompt').value;
-    if(!enhanceImgB64) return alert('Upload image first');
-    const res = await fetch('/api/enhance', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:currentUser, image:enhanceImgB64, mode, prompt})
-    });
-    const data = await res.json();
-    if(!data.success) return alert(data.msg);
-    document.getElementById('enhance-result').innerHTML = `
-        <img src="/api/get_img/${data.img_id}" class="img-preview rounded">
-        <a href="/api/get_img/${data.img_id}" download class="ml-2 text-blue-600">Download</a>
-    `;
-    refreshUser();
-}
-</script>
+        // ===================== 碰撞检测 =====================
+        function collisionCheck(shape, x, y) {
+            for (let row = 0; row < shape.length; row++) {
+                for (let col = 0; col < shape[row].length; col++) {
+                    if (shape[row][col]) {
+                        const newX = x + col;
+                        const newY = y + row;
+                        // 超出边界/碰到已落下的方块 = 碰撞
+                        if (
+                            newX < 0 || newX >= COLS ||
+                            newY >= ROWS ||
+                            (newY >= 0 && board[newY][newX])
+                        ) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // ===================== 绘制游戏 =====================
+        function drawGame() {
+            // 清空画布
+            CTX.fillStyle = '#000';
+            CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
+
+            // 绘制已固定的方块
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    if (board[row][col]) {
+                        drawBlock(CTX, col, row, board[row][col]);
+                    }
+                }
+            }
+
+            // 绘制当前下落方块
+            for (let row = 0; row < currentShape.length; row++) {
+                for (let col = 0; col < currentShape[row].length; col++) {
+                    if (currentShape[row][col]) {
+                        drawBlock(CTX, currentX + col, currentY + row, currentColor);
+                    }
+                }
+            }
+
+            // 绘制下一个方块预览
+            drawNextPiece();
+        }
+
+        // ===================== 绘制单个方块 =====================
+        function drawBlock(ctx, x, y, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+            ctx.strokeStyle = '#fff';
+            ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+        }
+
+        // ===================== 绘制下一个方块预览 =====================
+        function drawNextPiece() {
+            NEXT_CTX.fillStyle = '#000';
+            NEXT_CTX.fillRect(0, 0, NEXT_CANVAS.width, NEXT_CANVAS.height);
+            
+            const offsetX = (NEXT_CANVAS.width / 2) - (nextShape[0].length * BLOCK_SIZE / 2);
+            const offsetY = (NEXT_CANVAS.height / 2) - (nextShape.length * BLOCK_SIZE / 2);
+
+            for (let row = 0; row < nextShape.length; row++) {
+                for (let col = 0; col < nextShape[row].length; col++) {
+                    if (nextShape[row][col]) {
+                        NEXT_CTX.fillStyle = nextColor;
+                        NEXT_CTX.fillRect(
+                            offsetX + col * BLOCK_SIZE,
+                            offsetY + row * BLOCK_SIZE,
+                            BLOCK_SIZE - 1,
+                            BLOCK_SIZE - 1
+                        );
+                        NEXT_CTX.strokeStyle = '#fff';
+                        NEXT_CTX.strokeRect(
+                            offsetX + col * BLOCK_SIZE,
+                            offsetY + row * BLOCK_SIZE,
+                            BLOCK_SIZE - 1,
+                            BLOCK_SIZE - 1
+                        );
+                    }
+                }
+            }
+        }
+
+        // ===================== 固定下落到底的方块 =====================
+        function fixShape() {
+            for (let row = 0; row < currentShape.length; row++) {
+                for (let col = 0; col < currentShape[row].length; col++) {
+                    if (currentShape[row][col]) {
+                        const x = currentX + col;
+                        const y = currentY + row;
+                        if (y >= 0) board[y][x] = currentColor;
+                    }
+                }
+            }
+            clearLines(); // 消行
+            spawnShape(); // 生成新方块
+        }
+
+        // ===================== 消除满行 =====================
+        function clearLines() {
+            let linesCleared = 0;
+            for (let row = ROWS - 1; row >= 0; row--) {
+                if (board[row].every(cell => cell)) {
+                    // 删除满行，顶部添加空行
+                    board.splice(row, 1);
+                    board.unshift(Array(COLS).fill(0));
+                    row++; // 重新检查当前行
+                    linesCleared++;
+                }
+            }
+            // 计分规则：消1行100分，2行300，3行500，4行800
+            if (linesCleared > 0) {
+                score += [0, 100, 300, 500, 800][linesCleared];
+                document.getElementById('score').textContent = score;
+            }
+        }
+
+        // ===================== 方块下落 =====================
+        function dropDown() {
+            if (isGameOver || isPaused) return;
+            if (!collisionCheck(currentShape, currentX, currentY + 1)) {
+                currentY++;
+            } else {
+                fixShape();
+            }
+            drawGame();
+        }
+
+        // ===================== 方块旋转 =====================
+        function rotateShape() {
+            // 矩阵转置+反转 = 旋转
+            const rotated = currentShape[0].map((_, idx) => 
+                currentShape.map(row => row[idx]).reverse()
+            );
+            if (!collisionCheck(rotated, currentX, currentY)) {
+                currentShape = rotated;
+            }
+        }
+
+        // ===================== 键盘控制 =====================
+        document.addEventListener('keydown', (e) => {
+            if (isGameOver || isPaused) return;
+            
+            // 左箭头
+            if (e.key === 'ArrowLeft' && !collisionCheck(currentShape, currentX - 1, currentY)) {
+                currentX--;
+            }
+            // 右箭头
+            else if (e.key === 'ArrowRight' && !collisionCheck(currentShape, currentX + 1, currentY)) {
+                currentX++;
+            }
+            // 下箭头（加速下落）
+            else if (e.key === 'ArrowDown') {
+                dropDown();
+            }
+            // 上箭头（旋转）
+            else if (e.key === 'ArrowUp') {
+                rotateShape();
+            }
+            drawGame();
+        });
+
+        // ===================== 游戏开始 =====================
+        function startGame() {
+            initBoard();
+            spawnShape();
+            score = 0;
+            isGameOver = false;
+            isPaused = false;
+            document.getElementById('score').textContent = score;
+            clearInterval(gameInterval);
+            gameInterval = setInterval(dropDown, 800); // 800ms下落一次
+            drawGame();
+        }
+
+        // ===================== 暂停/继续 =====================
+        function togglePause() {
+            if (isGameOver) return;
+            isPaused = !isPaused;
+            document.getElementById('pause-btn').textContent = isPaused ? '继续游戏' : '暂停游戏';
+        }
+
+        // ===================== 按钮绑定 =====================
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('pause-btn').addEventListener('click', togglePause);
+        document.getElementById('reset-btn').addEventListener('click', startGame);
+    </script>
 </body>
 </html>

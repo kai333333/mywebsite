@@ -1,3 +1,224 @@
-hello world
-\n My world
-/\n My world
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Service - Chat & Image</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .tab-active { border-b-2 solid #2563eb; color: #2563eb; }
+        .img-preview { max-width: 200px; max-height: 200px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Login -->
+    <div id="auth" class="max-w-md mx-auto mt-20 p-6 bg-white rounded-xl shadow">
+        <h2 class="text-2xl font-bold mb-4">Login / Register</h2>
+        <input id="email" placeholder="Email" class="w-full p-2 border rounded mb-4">
+        <button onclick="login()" class="w-full bg-blue-600 text-white p-2 rounded">Continue</button>
+    </div>
+
+    <!-- Main -->
+    <div id="main" class="hidden max-w-6xl mx-auto p-5">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-blue-700">AI Service</h1>
+            <div class="text-lg font-semibold">Balance: <span id="points" class="text-green-600">0</span> Points</div>
+        </div>
+
+        <!-- Recharge -->
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-white p-4 rounded-xl shadow text-center cursor-pointer" onclick="recharge('10')">
+                <div class="text-xl font-bold">$10</div>
+                <div class="text-gray-600">100 Points</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow text-center cursor-pointer" onclick="recharge('20')">
+                <div class="text-xl font-bold">$20</div>
+                <div class="text-gray-600">220 Points</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow text-center cursor-pointer" onclick="recharge('50')">
+                <div class="text-xl font-bold">$50</div>
+                <div class="text-gray-600">600 Points</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-6 mb-6 border-b">
+            <div id="tab-chat" class="pb-2 font-semibold tab-active cursor-pointer" onclick="switchTab('chat')">Chat</div>
+            <div id="tab-image" class="pb-2 font-semibold text-gray-500 cursor-pointer" onclick="switchTab('image')">Image Gen</div>
+            <div id="tab-enhance" class="pb-2 font-semibold text-gray-500 cursor-pointer" onclick="switchTab('enhance')">Enhance</div>
+        </div>
+
+        <!-- Chat Tab -->
+        <div id="panel-chat" class="bg-white p-6 rounded-xl shadow mb-6">
+            <select id="model" class="mb-3 p-2 border rounded w-full">
+                <option value="basic">Basic (-3)</option>
+                <option value="advanced">Advanced (-5)</option>
+                <option value="pro">Pro (-8)</option>
+            </select>
+            <textarea id="prompt" rows="3" placeholder="Enter prompt..." class="w-full p-2 border rounded mb-3"></textarea>
+            <button onclick="runAI()" class="bg-blue-600 text-white px-4 py-2 rounded">Generate</button>
+            <textarea id="result" rows="6" placeholder="Result..." class="w-full p-2 border rounded mt-3 bg-gray-50" readonly></textarea>
+        </div>
+
+        <!-- Image Gen Tab -->
+        <div id="panel-image" class="hidden bg-white p-6 rounded-xl shadow mb-6">
+            <select id="img-size" class="mb-3 p-2 border rounded w-full">
+                <option value="512">512×512 (-5)</option>
+                <option value="768">768×768 (-8)</option>
+                <option value="1024">1024×1024 (-12)</option>
+            </select>
+            <textarea id="img-prompt" rows="3" placeholder="Describe image..." class="w-full p-2 border rounded mb-3"></textarea>
+            <button onclick="runImageGen()" class="bg-purple-600 text-white px-4 py-2 rounded">Generate Image</button>
+            <div id="img-result" class="mt-4"></div>
+        </div>
+
+        <!-- Enhance Tab (Img2Img + Beauty) -->
+        <div id="panel-enhance" class="hidden bg-white p-6 rounded-xl shadow mb-6">
+            <input type="file" id="enhance-file" accept="image/*" class="mb-3" onchange="previewEnhance()">
+            <div id="enhance-preview" class="mb-3"></div>
+            <select id="enhance-mode" class="mb-3 p-2 border rounded w-full">
+                <option value="upscale">Upscale 4x (-3)</option>
+                <option value="beauty">Beauty (-2)</option>
+                <option value="removebg">Remove BG (-4)</option>
+                <option value="style">Anime Style (-3)</option>
+                <option value="img2img">Img2Img (-6)</option>
+            </select>
+            <textarea id="enhance-prompt" rows="2" placeholder="Prompt (for img2img)..." class="w-full p-2 border rounded mb-3"></textarea>
+            <button onclick="runEnhance()" class="bg-pink-600 text-white px-4 py-2 rounded">Enhance</button>
+            <div id="enhance-result" class="mt-4"></div>
+        </div>
+
+        <!-- History -->
+        <div class="bg-white p-6 rounded-xl shadow">
+            <h3 class="font-bold mb-3">History</h3>
+            <ul id="history" class="max-h-60 overflow-y-auto"></ul>
+        </div>
+    </div>
+
+<script>
+let currentUser = null;
+let enhanceImgB64 = null;
+
+// Tab Switch
+function switchTab(tab) {
+    document.querySelectorAll('[id^="tab-"]').forEach(el=>{
+        el.classList.remove('tab-active');
+        el.classList.add('text-gray-500');
+    });
+    document.querySelectorAll('[id^="panel-"]').forEach(el=>el.classList.add('hidden'));
+    document.getElementById('tab-'+tab).classList.add('tab-active');
+    document.getElementById('tab-'+tab).classList.remove('text-gray-500');
+    document.getElementById('panel-'+tab).classList.remove('hidden');
+}
+
+// Login
+async function login() {
+    const email = document.getElementById('email').value.trim();
+    if(!email) return alert('Enter email');
+    const res = await fetch('/api/login', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email})
+    });
+    const data = await res.json();
+    currentUser = email;
+    document.getElementById('auth').classList.add('hidden');
+    document.getElementById('main').classList.remove('hidden');
+    refreshUser();
+}
+
+// Refresh User
+async function refreshUser() {
+    const res = await fetch('/api/user', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:currentUser})
+    });
+    const data = await res.json();
+    document.getElementById('points').innerText = data.user.points;
+    const list = document.getElementById('history');
+    list.innerHTML = '';
+    data.user.history.slice().reverse().forEach(h=>{
+        const li = document.createElement('li');
+        li.className = 'p-2 border-b flex items-center gap-2';
+        li.innerHTML = h.includes('img_') 
+            ? `${h.split(' | ')[0]} <img src="/api/get_img/${h.split(' | ')[1]}" class="w-10 h-10 rounded">`
+            : h;
+        list.appendChild(li);
+    });
+}
+
+// Recharge
+async function recharge(amt) {
+    const res = await fetch('/api/recharge', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:currentUser, amount:amt})
+    });
+    await res.json();
+    alert('Recharge success');
+    refreshUser();
+}
+
+// Chat AI
+async function runAI() {
+    const prompt = document.getElementById('prompt').value;
+    const model = document.getElementById('model').value;
+    if(!prompt) return alert('Enter prompt');
+    const res = await fetch('/api/ai', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:currentUser, prompt, model})
+    });
+    const data = await res.json();
+    if(!data.success) return alert(data.msg);
+    document.getElementById('result').value = data.result;
+    refreshUser();
+}
+
+// Image Gen
+async function runImageGen() {
+    const prompt = document.getElementById('img-prompt').value;
+    const size = document.getElementById('img-size').value;
+    if(!prompt) return alert('Enter prompt');
+    const res = await fetch('/api/image_gen', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:currentUser, prompt, size})
+    });
+    const data = await res.json();
+    if(!data.success) return alert(data.msg);
+    document.getElementById('img-result').innerHTML = `
+        <img src="/api/get_img/${data.img_id}" class="img-preview rounded">
+        <a href="/api/get_img/${data.img_id}" download class="ml-2 text-blue-600">Download</a>
+    `;
+    refreshUser();
+}
+
+// Preview Enhance Image
+function previewEnhance() {
+    const file = document.getElementById('enhance-file').files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        enhanceImgB64 = e.target.result.split(',')[1];
+        document.getElementById('enhance-preview').innerHTML = `<img src="${e.target.result}" class="img-preview rounded">`;
+    };
+    reader.readAsDataURL(file);
+}
+
+// Run Enhance
+async function runEnhance() {
+    const mode = document.getElementById('enhance-mode').value;
+    const prompt = document.getElementById('enhance-prompt').value;
+    if(!enhanceImgB64) return alert('Upload image first');
+    const res = await fetch('/api/enhance', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:currentUser, image:enhanceImgB64, mode, prompt})
+    });
+    const data = await res.json();
+    if(!data.success) return alert(data.msg);
+    document.getElementById('enhance-result').innerHTML = `
+        <img src="/api/get_img/${data.img_id}" class="img-preview rounded">
+        <a href="/api/get_img/${data.img_id}" download class="ml-2 text-blue-600">Download</a>
+    `;
+    refreshUser();
+}
+</script>
+</body>
+</html>
